@@ -1,3 +1,5 @@
+import { motion } from 'framer-motion'
+
 interface ChatMessageProps {
   content: string
   isUser: boolean
@@ -8,26 +10,65 @@ interface ChatMessageProps {
 
 export function ChatMessage({ content, isUser, timestamp, isStreaming }: ChatMessageProps) {
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div
-        className={`max-w-[80%] rounded-lg p-4 ${
+    <motion.div
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -20, scale: 0.95 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
+    >
+      <motion.div
+        initial={{ opacity: 0, x: isUser ? 20 : -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+        className={`max-w-[80%] rounded-lg p-4 backdrop-blur-sm ${
           isUser
-            ? 'bg-blue-500 text-white'
-            : 'bg-gray-200 text-gray-800'
+            ? 'bg-blue-500/90 text-white shadow-lg shadow-blue-500/20'
+            : 'bg-gray-200/90 text-gray-800 shadow-lg shadow-gray-500/10'
         }`}
       >
-        <div className="whitespace-pre-wrap">{content}</div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.2, delay: 0.2 }}
+          className="whitespace-pre-wrap"
+        >
+          {content}
+        </motion.div>
         {isStreaming && (
-          <div className="flex space-x-1 mt-2">
-            <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-            <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-            <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-          </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            className="flex space-x-1 mt-2"
+          >
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                className="w-2 h-2 bg-gray-500 rounded-full"
+                animate={{
+                  y: [0, -4, 0],
+                  scale: [1, 1.2, 1],
+                }}
+                transition={{
+                  duration: 1,
+                  repeat: Infinity,
+                  delay: i * 0.2,
+                  ease: "easeInOut",
+                }}
+              />
+            ))}
+          </motion.div>
         )}
-        <div className={`text-xs mt-2 ${isUser ? 'text-blue-100' : 'text-gray-500'}`}>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.2, delay: 0.3 }}
+          className={`text-xs mt-2 ${isUser ? 'text-blue-100' : 'text-gray-500'}`}
+        >
           {new Date(timestamp).toLocaleTimeString()}
-        </div>
-      </div>
-    </div>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   )
 } 
