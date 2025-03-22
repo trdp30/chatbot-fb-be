@@ -1,0 +1,52 @@
+services:
+  chatbot:
+    build: ./chat-bot
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      - OLLAMA_API_URL=http://ollama:11434
+    depends_on:
+      - ollama
+    networks:
+      - app-network
+    volumes:
+      - backend_data:/app/data
+
+  ollama:
+    build: 
+      context: ../ollama
+      dockerfile: Dockerfile
+    container_name: ollama-service
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    name: app-network
+    driver: bridge
+
+volumes:
+  backend_data:
+    name: backend_data
+  ollama-data:
+    external: true
+    name: ollama-data
