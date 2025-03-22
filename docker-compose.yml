@@ -23,7 +23,7 @@ services:
 
   ollama:
     build: 
-      context: ../ollama
+      context: ./ollama
       dockerfile: Dockerfile
     container_name: ollama-service
     ports:
