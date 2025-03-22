@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { ChatMessage } from "./ChatMessage"
 import { ChatInput } from "./ChatInput"
-import axios from "axios"
 
 interface Message {
   content: string
@@ -12,6 +11,7 @@ interface Message {
 export function ChatContainer() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [currentStreamingMessage, setCurrentStreamingMessage] = useState<string>("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -20,7 +20,7 @@ export function ChatContainer() {
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages])
+  }, [messages, currentStreamingMessage])
 
   const handleSendMessage = async (content: string) => {
     // Add user message
@@ -31,20 +31,60 @@ export function ChatContainer() {
     }
     setMessages((prev: Message[]) => [...prev, userMessage])
     setIsLoading(true)
+    setCurrentStreamingMessage("")
 
     try {
-      const response = await axios.post("http://localhost:3001/api/ollama", {
-        prompt: content,
+      const response = await fetch("http://localhost:3001/api/ollama", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prompt: content }),
       })
 
-      // Add AI response
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error("No reader available")
+      }
+
+      const decoder = new TextDecoder()
+      let accumulatedResponse = ""
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n').filter(line => line.trim())
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              if (data.response) {
+                accumulatedResponse += data.response
+                setCurrentStreamingMessage(accumulatedResponse)
+              }
+            } catch (e) {
+              console.error("Error parsing SSE data:", e)
+            }
+          }
+        }
+      }
+
+      // Add the complete AI response
       const aiMessage: Message = {
-        // @ts-ignore
-        content: response?.data?.text,
+        content: accumulatedResponse,
         isUser: false,
         timestamp: new Date().toISOString(),
       }
       setMessages((prev: Message[]) => [...prev, aiMessage])
+      setCurrentStreamingMessage("")
+
     } catch (error) {
       console.error("Error sending message:", error)
       // Add error message
@@ -54,6 +94,7 @@ export function ChatContainer() {
         timestamp: new Date().toISOString(),
       }
       setMessages((prev: Message[]) => [...prev, errorMessage])
+      setCurrentStreamingMessage("")
     } finally {
       setIsLoading(false)
     }
@@ -70,6 +111,14 @@ export function ChatContainer() {
             timestamp={message.timestamp}
           />
         ))}
+        {currentStreamingMessage && (
+          <ChatMessage
+            content={currentStreamingMessage}
+            isUser={false}
+            timestamp={new Date().toISOString()}
+            isStreaming={true}
+          />
+        )}
         <div ref={messagesEndRef} />
       </div>
       <ChatInput onSend={handleSendMessage} disabled={isLoading} />

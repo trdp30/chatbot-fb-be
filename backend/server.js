@@ -19,69 +19,61 @@ app.post('/api/ollama', async (req, res) => {
   try {
     const { prompt } = req.body;
     const OLLAMA_BASE_URL = process.env.OLLAMA_API_URL || "http://localhost:11434";
-    console.log('Using Ollama URL:', OLLAMA_BASE_URL);
-    console.log('Sending request to Ollama...');
     
-    // Add timeout and retry configuration
+    // Set headers for SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    // Make request to Ollama with streaming enabled
     const response = await axios.post(`${OLLAMA_BASE_URL}/api/generate`, { 
       prompt,
-      model: 'mistral'
+      model: 'mistral',
+      stream: true
     }, {
-      timeout: 30000, // 30 second timeout
-      maxRedirects: 5,
-      validateStatus: function (status) {
-        return status >= 200 && status < 500; // Accept all status codes less than 500
-      }
-    });
-    
-    console.log('Received response from Ollama');
-    
-    // Process the streaming response
-    const responseLines = response.data.split('\n').filter(line => line.trim());
-    let fullResponse = '';
-    let lastResponse = null;
-    
-    responseLines.forEach(line => {
-      try {
-        const data = JSON.parse(line);
-        if (data.response) {
-          fullResponse += data.response;
-        }
-        lastResponse = data;
-      } catch (e) {
-        console.error('Error parsing response line:', e);
-      }
+      responseType: 'stream',
+      timeout: 30000,
+      maxRedirects: 5
     });
 
-    // Send a clean response with both the full text and metadata
-    res.json({
-      text: fullResponse,
-      metadata: {
-        model: lastResponse?.model,
-        total_duration: lastResponse?.total_duration,
-        eval_count: lastResponse?.eval_count,
-        done: lastResponse?.done,
-        done_reason: lastResponse?.done_reason
-      }
+    // Pipe the Ollama response stream to the client
+    response.data.on('data', chunk => {
+      const lines = chunk.toString().split('\n').filter(line => line.trim());
+      lines.forEach(line => {
+        try {
+          const data = JSON.parse(line);
+          if (data.response) {
+            // Send each chunk as an SSE event
+            res.write(`data: ${JSON.stringify(data)}\n\n`);
+          }
+        } catch (e) {
+          console.error('Error parsing response line:', e);
+        }
+      });
     });
+
+    response.data.on('end', () => {
+      res.end();
+    });
+
+    response.data.on('error', (error) => {
+      console.error('Stream error:', error);
+      res.write(`data: ${JSON.stringify({ error: 'Stream error occurred' })}\n\n`);
+      res.end();
+    });
+
   } catch (error) {
     console.error('Error details:', {
       message: error.message,
       code: error.code,
-      response: error.response?.data,
-      config: {
-        url: error.config?.url,
-        method: error.config?.method,
-        headers: error.config?.headers
-      }
+      response: error.response?.data
     });
 
     if (error.code === 'ECONNREFUSED') {
       res.status(503).json({
         error: 'Ollama service is not ready yet',
         message: 'Please wait a few moments and try again',
-        details: error.message,
-        url: process.env.OLLAMA_API_URL
+        details: error.message
       });
     } else if (error.code === 'ETIMEDOUT') {
       res.status(504).json({
