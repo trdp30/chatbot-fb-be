@@ -1,7 +1,15 @@
 const express = require('express');
 const axios = require('axios');
+const cors = require('cors');
 const app = express();
 const port = 3001;
+
+// Enable CORS for all routes
+app.use(cors({
+  origin: 'http://localhost:3000', // Allow requests from the frontend
+  methods: ['GET', 'POST'], // Allow specific HTTP methods
+  allowedHeaders: ['Content-Type'] // Allow specific headers
+}));
 
 // Middleware to parse JSON requests
 app.use(express.json());
