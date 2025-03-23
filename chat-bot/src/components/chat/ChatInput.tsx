@@ -31,7 +31,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Type your message..."
           disabled={disabled}
-          className="w-full px-4 py-3 rounded-lg bg-gray/10 backdrop-blur-sm border border-gray/20 
+          className="w-full px-4 py-3 rounded-lg bg-white backdrop-blur-sm border border-gray/20 
                    text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 
                    focus:ring-blue-500/50 focus:border-transparent transition-all duration-200
                    disabled:opacity-50 disabled:cursor-not-allowed"
