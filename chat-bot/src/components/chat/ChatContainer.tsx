@@ -14,7 +14,9 @@ export function ChatContainer() {
   const [isLoading, setIsLoading] = useState(false)
   const [currentStreamingMessage, setCurrentStreamingMessage] = useState<string>("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const [hasStartedChat, setHasStartedChat] = useState(false)
+  const [hasStartedChat, _setHasStartedChat] = useState(false)
+  const [_uploadedFiles, setUploadedFiles] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -24,12 +26,73 @@ export function ChatContainer() {
     scrollToBottom()
   }, [messages, currentStreamingMessage])
 
-  const handleSendMessage = async (content: string) => {
-    // Set hasStartedChat to true on first message
-    if (!hasStartedChat) {
-      setHasStartedChat(true)
-    }
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files) return
 
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const formData = new FormData()
+      formData.append('file', file)
+
+      try {
+        const response = await fetch('http://localhost:3001/api/upload', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!response.ok) {
+          throw new Error('Upload failed')
+        }
+
+        // const data = await response.json()
+        await response.json()
+        setUploadedFiles(prev => [...prev, file.name])
+        
+        // Add system message about successful upload
+        setMessages(prev => [...prev, {
+          content: `Successfully uploaded ${file.name}`,
+          isUser: false,
+          timestamp: new Date().toISOString()
+        }])
+      } catch (error) {
+        console.error('Error uploading file:', error)
+        setMessages(prev => [...prev, {
+          content: `Failed to upload ${file.name}`,
+          isUser: false,
+          timestamp: new Date().toISOString()
+        }])
+      }
+    }
+  }
+
+  const handleClearStore = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/clear-store', {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to clear store')
+      }
+
+      setUploadedFiles([])
+      setMessages(prev => [...prev, {
+        content: 'Knowledge base cleared successfully',
+        isUser: false,
+        timestamp: new Date().toISOString()
+      }])
+    } catch (error) {
+      console.error('Error clearing store:', error)
+      setMessages(prev => [...prev, {
+        content: 'Failed to clear knowledge base',
+        isUser: false,
+        timestamp: new Date().toISOString()
+      }])
+    }
+  }
+
+  const handleSendMessage = async (content: string) => {
     // Add user message
     const userMessage: Message = {
       content,
@@ -152,16 +215,32 @@ export function ChatContainer() {
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               transition={{ duration: 0.3, delay: 0.2 }}
-              className="text-center max-w-md w-full"
+              className="text-center max-w-2xl w-full"
             >
               <h1 className="text-3xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-500">
                 Welcome to AI Chat
               </h1>
               <p className="text-gray-600 mb-8">
-                Start a conversation with our AI assistant. Ask anything and get instant responses!
+                Upload your documents and start a conversation with our AI assistant. The AI will use your documents to provide accurate answers!
               </p>
-              <div className="w-full max-w-md mx-auto">
-                <ChatInput onSend={handleSendMessage} disabled={isLoading} />
+              <div className="space-y-4">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  multiple
+                  accept=".txt,.md,.pdf"
+                  className="hidden"
+                />
+                <motion.button
+                  onClick={() => fileInputRef.current?.click()}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 
+                           transition-colors duration-200"
+                >
+                  Upload Documents
+                </motion.button>
               </div>
             </motion.div>
           </motion.div>
@@ -201,8 +280,19 @@ export function ChatContainer() {
             transition={{ duration: 0.3 }}
             className="relative p-4 backdrop-blur-md bg-white/10 border-t border-white/20 z-10 w-full"
           >
-            <div className="w-full">
-              <ChatInput onSend={handleSendMessage} disabled={isLoading} />
+            <div className="w-full flex gap-2">
+              <div className="flex-1">
+                <ChatInput onSend={handleSendMessage} disabled={isLoading} />
+              </div>
+              <motion.button
+                onClick={handleClearStore}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 
+                         transition-colors duration-200"
+              >
+                Clear Knowledge Base
+              </motion.button>
             </div>
           </motion.div>
         )}
